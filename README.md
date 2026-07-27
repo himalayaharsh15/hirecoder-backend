@@ -1,98 +1,231 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# HireCoder Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A production-ready backend application built with **NestJS**, **TypeScript**, and **Google Gemini AI**. The project is being developed to simulate a real-world recruitment platform while learning backend development, authentication, AI integration, and scalable software architecture.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+# Project Goals
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- Learn NestJS from fundamentals to production
+- Build a scalable backend architecture
+- Implement secure authentication
+- Integrate Large Language Models (LLMs)
+- Build AI-powered recruitment features
+- Follow software engineering best practices
 
-## Project setup
+---
 
-```bash
-$ npm install
+# Tech Stack
+
+## Backend
+
+- NestJS
+- TypeScript
+- Node.js
+
+## Validation
+
+- class-validator
+- class-transformer
+
+## Authentication
+
+- bcrypt
+
+## AI
+
+- Google Gemini
+- Google GenAI SDK
+
+## Configuration
+
+- @nestjs/config
+
+---
+
+# Current Features
+
+## Authentication
+
+- User Registration
+- DTO Validation
+- Password Validation
+- Custom Password Matching Decorator
+- Password Hashing using bcrypt
+
+---
+
+## AI
+
+- Resume Review API
+- Gemini Integration
+- Prompt Separation
+- Environment Variable Configuration
+- Automatic AI Model Fallback
+
+---
+
+# Project Structure
+
+```
+src
+│
+├── auth
+├── ai
+├── common
+│
+└── app.module.ts
+
+docs
+├── authentication.md
+├── ai-integration.md
+└── architecture.md
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+# Architecture
 
-# watch mode
-$ npm run start:dev
+```
+React
 
-# production mode
-$ npm run start:prod
+↓
+
+Axios
+
+↓
+
+NestJS
+
+↓
+
+Controllers
+
+↓
+
+Services
+
+↓
+
+Gemini AI
+
+↓
+
+Prisma (Upcoming)
+
+↓
+
+PostgreSQL (Upcoming)
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ npm run test
+# API Endpoints
 
-# e2e tests
-$ npm run test:e2e
+## Authentication
 
-# test coverage
-$ npm run test:cov
+### Register
+
+```
+POST /auth/register
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## AI
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Resume Review
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+```
+POST /ai/resume-review
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+# Environment Variables
 
-Check out a few resources that may come in handy when working with NestJS:
+Create a `.env` file.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```env
+GEMINI_API_KEY=YOUR_API_KEY
+GEMINI_MODEL=gemini-3.5-flash
+```
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# Getting Started
 
-## Stay in touch
+Install dependencies
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+npm install
+```
 
-## License
+Start development server
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+npm run start:dev
+```
+
+---
+
+# Upcoming Features
+
+## Authentication
+
+- Login
+- JWT Authentication
+- Refresh Tokens
+- Forgot Password
+- Email Verification
+
+---
+
+## User
+
+- Profile
+- Resume Upload
+- Profile Management
+
+---
+
+## AI
+
+- Resume PDF Analysis
+- ATS Score
+- Cover Letter Generator
+- Job Description Analyzer
+- Interview Coach
+- Streaming AI Responses
+
+---
+
+## Database
+
+- Prisma ORM
+- PostgreSQL
+- Migrations
+
+---
+
+# Documentation
+
+Detailed documentation is available inside the `docs` directory.
+
+- Authentication Module
+- AI Integration
+- Architecture
+
+---
+
+# Author
+
+**Himalaya Harsh**
+
+Frontend Developer transitioning into Full Stack & AI Engineering.
+
+---
+
+# License
+
+This project is developed for learning and portfolio purposes.
