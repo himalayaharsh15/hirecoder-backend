@@ -1,0 +1,115 @@
+// -----------------------------------------------------------
+// Prisma Generator
+// -----------------------------------------------------------
+// This tells Prisma to generate the Prisma Client.
+// The generated client will be available from:
+//
+// import { PrismaClient } from "@prisma/client"
+//
+// This is the standard setup used in most NestJS applications.
+// -----------------------------------------------------------
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -----------------------------------------------------------
+// Datasource
+// -----------------------------------------------------------
+// Defines the database Prisma should connect to.
+//
+// provider = "postgresql"
+//      Specifies the database type.
+//
+// url = env("DATABASE_URL")
+//      Reads the connection string from the .env file.
+//      This allows different URLs for development,
+//      staging and production without changing code.
+// -----------------------------------------------------------
+
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------
+// User Model
+// -----------------------------------------------------------
+// Every model represents one table inside PostgreSQL.
+//
+// Model Name
+//     User
+//
+// Database Table
+//     User
+//
+// Each property becomes a column in the table.
+// -----------------------------------------------------------
+model User {
+
+  // ---------------------------------------------------------
+  // Primary Key
+  //
+  // @id
+  //      Marks this field as the Primary Key.
+  //
+  // @default(cuid())
+  //      Automatically generates a globally unique ID.
+  //
+  // Example:
+  //      cmepn83kl0000y4k0wh8bpxh1
+  //
+  // Why not auto-increment?
+  //
+  // cuid() is safer for distributed systems and harder
+  // to guess than numeric IDs.
+  // ---------------------------------------------------------
+  id String @id @default(cuid())
+
+  // User's full name
+  name String
+
+  // ---------------------------------------------------------
+  // Unique Email
+  //
+  // @unique prevents duplicate email addresses.
+  //
+  // Prisma automatically creates a unique index.
+  //
+  // Example:
+  //      john@gmail.com
+  //
+  // Trying to register the same email twice
+  // will throw an error.
+  // ---------------------------------------------------------
+  email String @unique
+
+  // ---------------------------------------------------------
+  // Password
+  //
+  // This NEVER stores the plain password.
+  //
+  // Example stored value:
+  //
+  // $2b$10$R8N...
+  //
+  // Passwords will be hashed using bcrypt
+  // before saving.
+  // ---------------------------------------------------------
+  password String
+
+  // ---------------------------------------------------------
+  // Automatically set when the user is created.
+  // ---------------------------------------------------------
+  createdAt DateTime @default(now())
+
+  // ---------------------------------------------------------
+  // Automatically updated whenever this row changes.
+  //
+  // Example:
+  // User changes password
+  //
+  // updatedAt changes automatically.
+  // ---------------------------------------------------------
+  updatedAt DateTime @updatedAt
+}

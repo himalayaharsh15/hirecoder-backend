@@ -2,6 +2,9 @@ import { GoogleGenAI } from '@google/genai';
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { resumeReviewPrompt } from './prompts/resume-review.prompt';
+import { parseAIResponse } from './utils/json-parser';
+import { ResumeReview } from './Interface/resume-review.interface';
+import { AI_MODELS } from './config/model';
 
 @Injectable()
 export class AiService {
@@ -13,26 +16,17 @@ export class AiService {
   }
 
   async reviewResume(resume: string) {
-    const models = [
-      'gemini-3.5-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-2.5-pro',
-    ];
-    // const response = await this.ai.models.generateContent({
-    //   model: 'gemini-3.5-flash',
-    //   contents: resumeReviewPrompt(resume),
-    // });
-
-    // return response.text;
+    let models = AI_MODELS;
     for (let model of models) {
       try {
         const response = await this.ai.models.generateContent({
           model: model,
           contents: resumeReviewPrompt(resume),
         });
-        return response.text;
+        const review = parseAIResponse<ResumeReview>(response.text!);
+        return review;
       } catch (error) {
-        console.log('model Failed');
+        console.error(`Model ${model} failed`, error);
       }
     }
 
