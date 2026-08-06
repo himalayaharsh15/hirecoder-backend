@@ -1,115 +1,274 @@
-// -----------------------------------------------------------
-// Prisma Generator
-// -----------------------------------------------------------
-// This tells Prisma to generate the Prisma Client.
-// The generated client will be available from:
-//
-// import { PrismaClient } from "@prisma/client"
-//
-// This is the standard setup used in most NestJS applications.
-// -----------------------------------------------------------
+// ============================================================================
+// Prisma Configuration
+// ============================================================================
+enum UserRole {
+  CANDIDATE
+  RECRUITER
+  ADMIN
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  FREELANCE
+}
+
+enum ExperienceLevel {
+  FRESHER
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+}
+
+enum ApplicationStatus {
+  APPLIED
+  UNDER_REVIEW
+  SHORTLISTED
+  INTERVIEW_SCHEDULED
+  OFFERED
+  REJECTED
+  HIRED
+  WITHDRAWN
+}
+
 generator client {
   provider = "prisma-client-js"
 }
-
-// -----------------------------------------------------------
-// Datasource
-// -----------------------------------------------------------
-// Defines the database Prisma should connect to.
-//
-// provider = "postgresql"
-//      Specifies the database type.
-//
-// url = env("DATABASE_URL")
-//      Reads the connection string from the .env file.
-//      This allows different URLs for development,
-//      staging and production without changing code.
-// -----------------------------------------------------------
-
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// -----------------------------------------------------------
-// User Model
-// -----------------------------------------------------------
-// Every model represents one table inside PostgreSQL.
+// ============================================================================
+// User
+// ============================================================================
 //
-// Model Name
-//     User
+// Stores authentication and identity information.
 //
-// Database Table
-//     User
-//
-// Each property becomes a column in the table.
-// -----------------------------------------------------------
+// Responsibilities
+// ----------------
+// • Register/Login
+// • Password
+// • Refresh Token
+// • One Profile
+// ============================================================================
+
 model User {
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
 
-  // ---------------------------------------------------------
-  // Primary Key
-  //
-  // @id
-  //      Marks this field as the Primary Key.
-  //
-  // @default(cuid())
-  //      Automatically generates a globally unique ID.
-  //
-  // Example:
-  //      cmepn83kl0000y4k0wh8bpxh1
-  //
-  // Why not auto-increment?
-  //
-  // cuid() is safer for distributed systems and harder
-  // to guess than numeric IDs.
-  // ---------------------------------------------------------
-  id String @id @default(cuid())
-
-  // User's full name
-  name String
-
-  // ---------------------------------------------------------
-  // Unique Email
-  //
-  // @unique prevents duplicate email addresses.
-  //
-  // Prisma automatically creates a unique index.
-  //
-  // Example:
-  //      john@gmail.com
-  //
-  // Trying to register the same email twice
-  // will throw an error.
-  // ---------------------------------------------------------
+  id    String @id @default(cuid())
+  name  String
   email String @unique
 
-  // ---------------------------------------------------------
-  // Password
-  //
-  // This NEVER stores the plain password.
-  //
-  // Example stored value:
-  //
-  // $2b$10$R8N...
-  //
-  // Passwords will be hashed using bcrypt
-  // before saving.
-  // ---------------------------------------------------------
-  password String
+  // --------------------------------------------------------------------------
+  // Authentication
+  // --------------------------------------------------------------------------
 
-  // ---------------------------------------------------------
-  // Automatically set when the user is created.
-  // ---------------------------------------------------------
+  password           String
+  hashedRefreshToken String?
+
+  role UserRole @default(CANDIDATE)
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
+
+  /// One User -> One Profile
+  profile Profile?
+
+  // Future Relations
+  // companies Company[]
+  // applications Application[]
+  // savedJobs SavedJob[]
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  companies    Company[]
+  applications Application[]
+  savedJobs    SavedJob[]
+}
+
+// ============================================================================
+// Profile
+// ============================================================================
+//
+// Stores professional information.
+//
+// Authentication data DOES NOT belong here.
+//
+// User (1) ---------- (1) Profile
+// ============================================================================
+
+model Profile {
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
+
+  id String @id @default(cuid())
+
+  // --------------------------------------------------------------------------
+  // Professional Information
+  // --------------------------------------------------------------------------
+
+  headline String?
+
+  bio String?
+
+  location String?
+
+  experience Int?
+
+  skills String[] @default([])
+
+  // --------------------------------------------------------------------------
+  // Social Links
+  // --------------------------------------------------------------------------
+
+  githubUrl String?
+
+  linkedinUrl String?
+
+  portfolioUrl String?
+
+  resumeUrl String?
+
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
   createdAt DateTime @default(now())
 
-  // ---------------------------------------------------------
-  // Automatically updated whenever this row changes.
-  //
-  // Example:
-  // User changes password
-  //
-  // updatedAt changes automatically.
-  // ---------------------------------------------------------
   updatedAt DateTime @updatedAt
+}
+
+model Company {
+  id String @id @default(cuid())
+
+  name String
+
+  description String?
+
+  website String?
+
+  location String?
+
+  logoUrl String?
+
+  ownerId String
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  jobs Job[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id String @id @default(cuid())
+
+  title String
+
+  description String
+
+  location String?
+
+  employmentType EmploymentType
+
+  experienceLevel ExperienceLevel
+
+  salaryMin Int?
+
+  salaryMax Int?
+
+  currency String @default("INR")
+
+  isActive Boolean @default(true)
+
+  companyId String
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  applications Application[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime   @updatedAt
+  savedJobs SavedJob[]
+}
+
+model Application {
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
+
+  id String @id @default(cuid())
+
+  // --------------------------------------------------------------------------
+  // Application Details
+  // --------------------------------------------------------------------------
+
+  status ApplicationStatus @default(APPLIED)
+
+  coverLetter String?
+
+  resumeUrl String?
+
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
+
+  candidateId String
+
+  jobId String
+
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  // --------------------------------------------------------------------------
+  // Constraints
+  // --------------------------------------------------------------------------
+
+  @@unique([candidateId, jobId])
+}
+
+model SavedJob {
+  id String @id @default(cuid())
+
+  candidateId String
+  candidate   User   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([candidateId, jobId])
 }
