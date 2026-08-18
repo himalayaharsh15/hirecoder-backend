@@ -88,29 +88,107 @@ export class ApplicationService {
   }
 
   async applyToJob(userId: string, jobId: string, dto: CreateApplicationDto) {
+    // ============================================================
+    // 1. CHECK THAT JOB EXISTS AND IS ACTIVE
+    // ============================================================
+
     const job = await this.getActiveJobOrThrow(jobId);
 
-    await this.ensureNotApplied(userId, job.id);
+    // ============================================================
+    // 2. CHECK EXISTING APPLICATION
+    // ============================================================
+
+    const existingApplication = await this.prisma.application.findUnique({
+      where: {
+        candidateId_jobId: {
+          candidateId: userId,
+          jobId: job.id,
+        },
+      },
+    });
+
+    // ============================================================
+    // 3. HANDLE EXISTING APPLICATION
+    // ============================================================
+
+    if (existingApplication) {
+      // ----------------------------------------------------------
+      // WITHDRAWN APPLICATION
+      //
+      // Candidate is allowed to apply again.
+      // We reuse the same application record because
+      // candidateId + jobId is unique in Prisma.
+      // ----------------------------------------------------------
+
+      if (existingApplication.status === ApplicationStatus.WITHDRAWN) {
+        const application = await this.prisma.application.update({
+          where: {
+            id: existingApplication.id,
+          },
+
+          data: {
+            status: ApplicationStatus.APPLIED,
+            coverLetter: dto.coverLetter,
+            resumeUrl: dto.resumeUrl,
+          },
+
+          include: {
+            job: {
+              select: {
+                id: true,
+                title: true,
+                company: {
+                  select: {
+                    id: true,
+                    name: true,
+                    logoUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        return {
+          message: 'Application submitted successfully.',
+          application,
+        };
+      }
+
+      // ----------------------------------------------------------
+      // ALL OTHER EXISTING APPLICATIONS
+      // ----------------------------------------------------------
+
+      throw new ConflictException('You have already applied to this job.');
+    }
+
+    // ============================================================
+    // 4. CREATE NEW APPLICATION
+    // ============================================================
 
     const application = await this.prisma.application.create({
       data: {
         ...dto,
+
         candidate: {
           connect: {
             id: userId,
           },
         },
+
         job: {
           connect: {
             id: jobId,
           },
         },
       },
+
       include: {
         job: {
           select: {
             id: true,
             title: true,
+
             company: {
               select: {
                 id: true,
@@ -286,7 +364,12 @@ export class ApplicationService {
                   headline: true,
                   experience: true,
                   skills: true,
-                  resumeUrl: true,
+                },
+              },
+              resume: {
+                select: {
+                  fileUrl: true,
+                  fileName: true,
                 },
               },
             },
@@ -348,6 +431,143 @@ export class ApplicationService {
     return {
       message: 'Application status updated successfully.',
       application: updatedApplication,
+    };
+  }
+
+  async getRecruiterApplicationSummary(recruiterId: string) {
+    const applications = await this.prisma.application.findMany({
+      where: {
+        job: {
+          company: {
+            ownerId: recruiterId,
+          },
+        },
+      },
+      select: {
+        status: true,
+      },
+    });
+
+    const totalApplicants = applications.length;
+
+    const applied = applications.filter(
+      (application) => application.status === ApplicationStatus.APPLIED,
+    ).length;
+
+    const underReview = applications.filter(
+      (application) => application.status === ApplicationStatus.UNDER_REVIEW,
+    ).length;
+
+    const shortlisted = applications.filter(
+      (application) => application.status === ApplicationStatus.SHORTLISTED,
+    ).length;
+
+    const interviewScheduled = applications.filter(
+      (application) =>
+        application.status === ApplicationStatus.INTERVIEW_SCHEDULED,
+    ).length;
+
+    const offered = applications.filter(
+      (application) => application.status === ApplicationStatus.OFFERED,
+    ).length;
+
+    const rejected = applications.filter(
+      (application) => application.status === ApplicationStatus.REJECTED,
+    ).length;
+
+    const hired = applications.filter(
+      (application) => application.status === ApplicationStatus.HIRED,
+    ).length;
+
+    const withdrawn = applications.filter(
+      (application) => application.status === ApplicationStatus.WITHDRAWN,
+    ).length;
+
+    return {
+      totalApplicants,
+
+      shortlisted,
+
+      interviews: interviewScheduled,
+
+      hired,
+
+      pipeline: {
+        applied,
+        underReview,
+        shortlisted,
+        interviewScheduled,
+        offered,
+        rejected,
+        hired,
+        withdrawn,
+      },
+    };
+  }
+
+  async getRecentRecruiterApplications(recruiterId: string) {
+    const applications = await this.prisma.application.findMany({
+      where: {
+        job: {
+          company: {
+            ownerId: recruiterId,
+          },
+        },
+      },
+
+      take: 5,
+
+      orderBy: {
+        createdAt: 'desc',
+      },
+
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+
+        candidate: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+
+            profile: {
+              select: {
+                headline: true,
+                experience: true,
+                skills: true,
+              },
+            },
+            resume: {
+              select: {
+                fileUrl: true,
+                fileName: true,
+              },
+            },
+          },
+        },
+
+        job: {
+          select: {
+            id: true,
+            title: true,
+
+            company: {
+              select: {
+                id: true,
+                name: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      applications,
     };
   }
 }

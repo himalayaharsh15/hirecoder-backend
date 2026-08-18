@@ -157,7 +157,7 @@ export class ApplicationController {
     status: 404,
     description: 'Application not found.',
   })
-  @Patch('/applications/:applicationId/status')
+  @Patch('/:applicationId/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RECRUITER)
   updateApplicationStatus(
@@ -170,5 +170,35 @@ export class ApplicationController {
       applicationId,
       dto,
     );
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get recruiter application summary',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recruiter application summary retrieved successfully.',
+  })
+  @Get('recruiter/summary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RECRUITER)
+  getRecruiterApplicationSummary(@CurrentUser() user) {
+    return this.applicationService.getRecruiterApplicationSummary(user.id);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get recent applications for recruiter',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recent applications retrieved successfully.',
+  })
+  @Get('recruiter/recent')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RECRUITER)
+  getRecentRecruiterApplications(@CurrentUser() user) {
+    return this.applicationService.getRecentRecruiterApplications(user.id);
   }
 }

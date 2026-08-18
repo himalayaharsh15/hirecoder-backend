@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,6 +11,8 @@ import { UpdateJobDto } from './dto/update-job.dto';
 import { JobOwnerService } from './job-owner.service';
 import { Prisma } from '@prisma/client';
 import { FilterJobDto } from './dto/filter-job.dto';
+import { JobAggregationService } from './aggregatoion/job-aggregation.service';
+import { ApplyJobDto } from './dto/apply-job.dto';
 
 @Injectable()
 export class JobService {
@@ -17,12 +20,14 @@ export class JobService {
     private readonly prisma: PrismaService,
     private readonly jobOwnerService: JobOwnerService,
   ) {}
+
   async createJob(userId: string, companyId: string, dto: CreateJobDto) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: {
         id: true,
         ownerId: true,
+        name: true,
       },
     });
 
@@ -39,11 +44,27 @@ export class JobService {
     const job = await this.prisma.job.create({
       data: {
         ...dto,
+
+        // This job was created directly on HireCoder.
+        source: 'HIRECODER',
+
+        // The authenticated recruiter owns this job.
+        recruiter: {
+          connect: {
+            id: userId,
+          },
+        },
+
+        // Keep the existing Company relationship.
         company: {
           connect: {
             id: companyId,
           },
         },
+
+        // Store the company name directly so the unified job
+        // feed can display it without depending on the Company relation.
+        companyName: company.name,
       },
     });
 
@@ -96,9 +117,7 @@ export class JobService {
     const [jobs, total] = await Promise.all([
       this.prisma.job.findMany({
         where: {
-          company: {
-            ownerId: userId,
-          },
+          recruiterId: userId,
         },
         include: {
           company: {
@@ -203,6 +222,12 @@ export class JobService {
       where.OR = [
         {
           title: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          companyName: {
             contains: search,
             mode: 'insensitive',
           },
@@ -344,6 +369,209 @@ export class JobService {
       message: 'Company retrieved successfully',
       ...company,
       jobsCount: company._count.jobs,
+    };
+  }
+
+  async saveJob(userId: string, jobId: string) {
+    const job = await this.prisma.job.findUnique({
+      where: {
+        id: jobId,
+      },
+    });
+
+    if (!job || !job.isActive) {
+      throw new NotFoundException('Job not found');
+    }
+
+    const existingSavedJob = await this.prisma.savedJob.findUnique({
+      where: {
+        candidateId_jobId: {
+          candidateId: userId,
+          jobId,
+        },
+      },
+    });
+
+    if (existingSavedJob) {
+      return {
+        message: 'Job already saved',
+        saved: true,
+      };
+    }
+
+    await this.prisma.savedJob.create({
+      data: {
+        candidateId: userId,
+        jobId,
+      },
+    });
+
+    return {
+      message: 'Job saved successfully',
+      saved: true,
+    };
+  }
+
+  async unsaveJob(userId: string, jobId: string) {
+    const savedJob = await this.prisma.savedJob.findUnique({
+      where: {
+        candidateId_jobId: {
+          candidateId: userId,
+          jobId,
+        },
+      },
+    });
+
+    if (!savedJob) {
+      return {
+        message: 'Job is not saved',
+        saved: false,
+      };
+    }
+
+    await this.prisma.savedJob.delete({
+      where: {
+        id: savedJob.id,
+      },
+    });
+
+    return {
+      message: 'Job removed from saved jobs',
+      saved: false,
+    };
+  }
+
+  async getSavedJobs(userId: string) {
+    const savedJobs = await this.prisma.savedJob.findMany({
+      where: {
+        candidateId: userId,
+        job: {
+          isActive: true,
+        },
+      },
+      include: {
+        job: {
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+                logoUrl: true,
+                location: true,
+              },
+            },
+            _count: {
+              select: {
+                applications: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return {
+      message: 'Saved jobs retrieved successfully',
+      jobs: savedJobs.map((savedJob) => savedJob.job),
+    };
+  }
+
+  async isJobSaved(userId: string, jobId: string) {
+    const savedJob = await this.prisma.savedJob.findUnique({
+      where: {
+        candidateId_jobId: {
+          candidateId: userId,
+          jobId,
+        },
+      },
+    });
+
+    return {
+      saved: !!savedJob,
+    };
+  }
+
+  async applyToJob(userId: string, jobId: string, dto: ApplyJobDto) {
+    const job = await this.prisma.job.findUnique({
+      where: {
+        id: jobId,
+      },
+    });
+
+    if (!job || !job.isActive) {
+      throw new NotFoundException('Job not found or no longer active');
+    }
+
+    const existingApplication = await this.prisma.application.findUnique({
+      where: {
+        candidateId_jobId: {
+          candidateId: userId,
+          jobId,
+        },
+      },
+    });
+
+    if (existingApplication) {
+      throw new ConflictException('You have already applied for this job');
+    }
+
+    const application = await this.prisma.application.create({
+      data: {
+        candidateId: userId,
+        jobId,
+        coverLetter: dto.coverLetter,
+        resumeUrl: dto.resumeUrl,
+      },
+      include: {
+        job: {
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      message: 'Application submitted successfully',
+      application,
+    };
+  }
+
+  async getMyApplication(userId: string, jobId: string) {
+    const application = await this.prisma.application.findUnique({
+      where: {
+        candidateId_jobId: {
+          candidateId: userId,
+          jobId,
+        },
+      },
+      include: {
+        job: {
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      applied: !!application,
+      application,
     };
   }
 }

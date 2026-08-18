@@ -34,6 +34,13 @@ enum ApplicationStatus {
   WITHDRAWN
 }
 
+enum JobSource {
+  HIRECODER
+  GREENHOUSE
+  ASHBY
+  ADZUNA
+}
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -81,20 +88,21 @@ model User {
   /// One User -> One Profile
   profile Profile?
 
-  // Future Relations
-  // companies Company[]
-  // applications Application[]
-  // savedJobs SavedJob[]
+  resume Resume?
+
+  companies    Company[]
+  applications Application[]
+  savedJobs    SavedJob[]
+
+  /// Jobs directly created by this recruiter
+  recruiterJobs Job[] @relation("RecruiterJobs")
 
   // --------------------------------------------------------------------------
   // Audit
   // --------------------------------------------------------------------------
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  companies    Company[]
-  applications Application[]
-  savedJobs    SavedJob[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================================
@@ -139,8 +147,6 @@ model Profile {
 
   portfolioUrl String?
 
-  resumeUrl String?
-
   // --------------------------------------------------------------------------
   // Relations
   // --------------------------------------------------------------------------
@@ -182,37 +188,129 @@ model Company {
   updatedAt DateTime @updatedAt
 }
 
+// ============================================================================
+// Job
+// ============================================================================
+//
+// Unified job model.
+//
+// A Job can come from:
+// 1. HireCoder recruiter
+// 2. External job source such as Greenhouse, Ashby, Adzuna, etc.
+//
+// The candidate doesn't need to know how the job entered HireCoder.
+// ============================================================================
+
 model Job {
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
+
   id String @id @default(cuid())
 
-  title String
-
+  title       String
   description String
 
-  location String?
+  // --------------------------------------------------------------------------
+  // Job Details
+  // --------------------------------------------------------------------------
 
-  employmentType EmploymentType
-
+  location        String?
+  employmentType  EmploymentType
   experienceLevel ExperienceLevel
 
   salaryMin Int?
-
   salaryMax Int?
+  currency  String @default("INR")
 
-  currency String @default("INR")
+  // --------------------------------------------------------------------------
+  // Company
+  // --------------------------------------------------------------------------
+  //
+  // For HireCoder jobs, companyId can point to our Company table.
+  //
+  // For external jobs, companyId can be null because the external company
+  // may not have a HireCoder account.
+  // --------------------------------------------------------------------------
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  // Company name is stored directly so external jobs can still display
+  // the company name even when there is no HireCoder Company record.
+  companyName String?
+
+  // --------------------------------------------------------------------------
+  // Job Source
+  // --------------------------------------------------------------------------
+
+  source JobSource @default(HIRECODER)
+
+  // ID assigned by the external job provider.
+  //
+  // Example:
+  // Greenhouse -> sourceJobId
+  // Ashby      -> sourceJobId
+  //
+  // HireCoder jobs don't need this.
+  sourceJobId String?
+
+  // --------------------------------------------------------------------------
+  // External Job URLs
+  // --------------------------------------------------------------------------
+
+  // Original job page.
+  sourceUrl String?
+
+  // Actual application page.
+  applyUrl String?
+
+  // --------------------------------------------------------------------------
+  // Recruiter
+  // --------------------------------------------------------------------------
+  //
+  // Only HireCoder-created jobs need a recruiter.
+  // External jobs have recruiterId = null.
+  // --------------------------------------------------------------------------
+
+  recruiterId String?
+
+  recruiter User? @relation("RecruiterJobs", fields: [recruiterId], references: [id], onDelete: SetNull)
+
+  // --------------------------------------------------------------------------
+  // Status
+  // --------------------------------------------------------------------------
 
   isActive Boolean @default(true)
 
-  companyId String
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
 
   applications Application[]
+  savedJobs    SavedJob[]
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  updatedAt DateTime   @updatedAt
-  savedJobs SavedJob[]
+  // --------------------------------------------------------------------------
+  // Indexes / Constraints
+  // --------------------------------------------------------------------------
+
+  // Prevents importing the same external job twice.
+  //
+  // Because sourceJobId is optional, HireCoder jobs can have null here.
+  @@unique([source, sourceJobId])
+  // Helps us quickly find jobs from a particular source.
+  @@index([source])
+  // Helps with recruiter dashboard queries.
+  @@index([recruiterId])
+  // Helps with company-related queries.
+  @@index([companyId])
 }
 
 model Application {
@@ -271,4 +369,51 @@ model SavedJob {
   createdAt DateTime @default(now())
 
   @@unique([candidateId, jobId])
+}
+
+// ============================================================================
+// Resume
+// ============================================================================
+//
+// Stores the candidate's uploaded resume.
+//
+// The actual PDF can be stored in object/file storage.
+// `fileUrl` stores its location.
+//
+// `extractedText` stores the text extracted from the PDF so that
+// AI features don't need to parse the same PDF repeatedly.
+//
+// User (1) ---------- (1) Resume
+// ============================================================================
+
+model Resume {
+  id String @id @default(cuid())
+
+  // --------------------------------------------------------------------------
+  // File information
+  // --------------------------------------------------------------------------
+
+  fileName String
+  fileUrl  String?
+
+  // --------------------------------------------------------------------------
+  // Extracted resume content
+  // --------------------------------------------------------------------------
+
+  extractedText String
+
+  // --------------------------------------------------------------------------
+  // Candidate
+  // --------------------------------------------------------------------------
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

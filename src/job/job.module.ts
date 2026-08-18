@@ -3,11 +3,18 @@ import { JobController } from './job.controller';
 import { JobService } from './job.service';
 import { JobOwnerService } from './job-owner.service';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { JobAggregationService } from './aggregatoion/job-aggregation.service';
+import { GreenhouseProvider } from './aggregatoion/provider/greenhouse.provider';
 
 @Module({
   imports: [PrismaModule],
   controllers: [JobController],
-  providers: [JobService, JobOwnerService],
+  providers: [
+    JobService,
+    JobOwnerService,
+    JobAggregationService,
+    GreenhouseProvider,
+  ],
   exports: [JobOwnerService],
 })
 export class JobModule {}

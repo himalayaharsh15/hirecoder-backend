@@ -13,9 +13,7 @@ export class JobOwnerService {
     const job = await this.prisma.job.findFirst({
       where: {
         id: jobId,
-        company: {
-          ownerId: userId,
-        },
+        recruiterId: userId,
       },
       include: {
         company: {
