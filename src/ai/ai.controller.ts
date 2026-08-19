@@ -24,6 +24,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import type { UploadedResumeFile } from './Interface/resume.interface';
+import { EvaluateInterviewAnswerDTO } from './DTO/evaluate-interview-answer.dto';
+import type { UploadedAudioFile } from './Interface/audio.interface';
 
 @ApiTags('AI')
 @Controller('ai')
@@ -175,5 +177,103 @@ export class AiController {
   })
   analyzeMyJobMatch(@Param('jobId') jobId: string, @CurrentUser() user: any) {
     return this.aiService.analyzeMyJobMatch(user.id, jobId);
+  }
+
+  @Post('interview-prep/:jobId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Generate interview preparation',
+    description:
+      "Generates interview questions based on the authenticated candidate's resume and the selected job.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Interview preparation generated successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Resume has not been uploaded or job is invalid.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized.',
+  })
+  generateMyInterviewPrep(
+    @Param('jobId') jobId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.aiService.generateMyInterviewPrep(user.id, jobId);
+  }
+
+  @Post('interview/evaluate/:jobId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Evaluate an interview answer',
+    description:
+      'Evaluates a candidate answer against an interview question and the selected job.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Interview answer evaluated successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid interview answer or job.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized.',
+  })
+  evaluateInterviewAnswer(
+    @Param('jobId') jobId: string,
+    @Body() dto: EvaluateInterviewAnswerDTO,
+    @CurrentUser() user: any,
+  ) {
+    return this.aiService.evaluateMyInterviewAnswer(
+      user.id,
+      jobId,
+      dto.question,
+      dto.answer,
+    );
+  }
+
+  @Post('interview/transcribe')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Transcribe interview audio',
+    description:
+      'Uploads an interview recording and converts the spoken answer into text using AI.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Audio transcribed successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid audio file.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized.',
+  })
+  async transcribeInterviewAudio(@UploadedFile() file: UploadedAudioFile) {
+    return this.aiService.transcribeInterviewAudio(file);
   }
 }

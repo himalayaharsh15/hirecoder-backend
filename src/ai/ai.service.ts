@@ -14,6 +14,11 @@ import { JobMatch } from './Interface/job-match.interface';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UploadedResumeFile } from './Interface/resume.interface';
 import { PDFParse } from 'pdf-parse';
+import { interviewPrepPrompt } from './prompts/interview-prep.prompt';
+import { InterviewPrep } from './Interface/interview-prep.interface';
+import { interviewEvaluationPrompt } from './prompts/interview-evaluation.prompt';
+import { InterviewEvaluation } from './Interface/interview-evaluation.interface';
+import { UploadedAudioFile } from './Interface/audio.interface';
 
 @Injectable()
 export class AiService {
@@ -285,5 +290,301 @@ export class AiService {
       },
       analysis: result,
     };
+  }
+
+  async generateInterviewPrep(resume: string, jobDescription: string) {
+    const models = AI_MODELS;
+
+    for (const model of models) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: interviewPrepPrompt(resume, jobDescription),
+        });
+
+        const result = parseAIResponse<InterviewPrep>(response.text!);
+
+        return result;
+      } catch (error) {
+        console.error(`Model ${model} failed`, error);
+      }
+    }
+
+    throw new ServiceUnavailableException('All AI models are unavailable');
+  }
+
+  async generateMyInterviewPrep(userId: string, jobId: string) {
+    // ============================================================
+    // 1. Get candidate resume
+    // ============================================================
+
+    const resume = await this.prisma.resume.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        id: true,
+        fileName: true,
+        extractedText: true,
+      },
+    });
+
+    if (!resume) {
+      throw new BadRequestException(
+        'Please upload your resume before starting interview preparation.',
+      );
+    }
+
+    // ============================================================
+    // 2. Validate extracted resume text
+    // ============================================================
+
+    if (!resume.extractedText?.trim()) {
+      throw new BadRequestException(
+        'No extracted resume text is available. Please upload your resume again.',
+      );
+    }
+
+    // ============================================================
+    // 3. Get job
+    // ============================================================
+
+    const job = await this.prisma.job.findUnique({
+      where: {
+        id: jobId,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        isActive: true,
+      },
+    });
+
+    if (!job) {
+      throw new BadRequestException('Job not found.');
+    }
+
+    // ============================================================
+    // 4. Make sure job is active
+    // ============================================================
+
+    if (!job.isActive) {
+      throw new BadRequestException('This job is no longer active.');
+    }
+
+    // ============================================================
+    // 5. Generate interview questions
+    // ============================================================
+
+    const result = await this.generateInterviewPrep(
+      resume.extractedText,
+      job.description,
+    );
+
+    // ============================================================
+    // 6. Return structured response
+    // ============================================================
+
+    return {
+      job: {
+        id: job.id,
+        title: job.title,
+      },
+
+      resume: {
+        id: resume.id,
+        fileName: resume.fileName,
+      },
+
+      interviewPrep: result,
+    };
+  }
+
+  async evaluateInterviewAnswer(
+    question: string,
+    answer: string,
+    jobDescription: string,
+  ) {
+    const models = AI_MODELS;
+
+    for (const model of models) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: interviewEvaluationPrompt(question, answer, jobDescription),
+        });
+
+        const result = parseAIResponse<InterviewEvaluation>(response.text!);
+
+        return result;
+      } catch (error) {
+        console.error(`Model ${model} failed`, error);
+      }
+    }
+
+    throw new ServiceUnavailableException('All AI models are unavailable');
+  }
+
+  async evaluateMyInterviewAnswer(
+    userId: string,
+    jobId: string,
+    question: string,
+    answer: string,
+  ) {
+    // ============================================================
+    // 1. Validate answer
+    // ============================================================
+
+    if (!answer?.trim()) {
+      throw new BadRequestException('Interview answer is required.');
+    }
+
+    // ============================================================
+    // 2. Make sure candidate has a resume
+    // ============================================================
+
+    const resume = await this.prisma.resume.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!resume) {
+      throw new BadRequestException(
+        'Please upload your resume before starting the interview.',
+      );
+    }
+
+    // ============================================================
+    // 3. Get job
+    // ============================================================
+
+    const job = await this.prisma.job.findUnique({
+      where: {
+        id: jobId,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        isActive: true,
+      },
+    });
+
+    if (!job) {
+      throw new BadRequestException('Job not found.');
+    }
+
+    if (!job.isActive) {
+      throw new BadRequestException('This job is no longer active.');
+    }
+
+    // ============================================================
+    // 4. Evaluate answer using AI
+    // ============================================================
+
+    const evaluation = await this.evaluateInterviewAnswer(
+      question,
+      answer,
+      job.description,
+    );
+
+    // ============================================================
+    // 5. Return result
+    // ============================================================
+
+    return {
+      job: {
+        id: job.id,
+        title: job.title,
+      },
+
+      question,
+
+      evaluation,
+    };
+  }
+
+  async transcribeInterviewAudio(file: UploadedAudioFile) {
+    if (!file) {
+      throw new BadRequestException('Audio recording is required.');
+    }
+
+    const MAX_AUDIO_SIZE = 10 * 1024 * 1024;
+
+    if (file.size > MAX_AUDIO_SIZE) {
+      throw new BadRequestException(
+        'Audio recording must be smaller than 10 MB.',
+      );
+    }
+
+    if (!file.mimetype.startsWith('audio/')) {
+      throw new BadRequestException('Only audio files are supported.');
+    }
+
+    try {
+      const audioBlob = new Blob([new Uint8Array(file.buffer)], {
+        type: file.mimetype,
+      });
+      const audioFile = await this.ai.files.upload({
+        file: audioBlob,
+        config: {
+          mimeType: file.mimetype,
+          displayName: file.originalname,
+        },
+      });
+
+      const response = await this.ai.models.generateContent({
+        model: AI_MODELS[0],
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `
+Generate an accurate transcript of the speech
+in this audio recording.
+
+Return ONLY the transcript.
+
+Do not summarize.
+Do not analyze the answer.
+Do not add commentary.
+Do not add quotation marks.
+                `,
+              },
+              {
+                fileData: {
+                  fileUri: audioFile.uri,
+                  mimeType: audioFile.mimeType,
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const transcript = response.text?.trim();
+
+      if (!transcript) {
+        throw new BadRequestException(
+          'Could not extract speech from the recording.',
+        );
+      }
+
+      return {
+        transcript,
+      };
+    } catch (error) {
+      console.error('Interview audio transcription failed:', error);
+
+      throw new ServiceUnavailableException(
+        'Unable to transcribe the interview recording.',
+      );
+    }
   }
 }
