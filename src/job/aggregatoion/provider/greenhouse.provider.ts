@@ -141,8 +141,17 @@ export class GreenhouseProvider implements ExternalJobProvider {
    * Read configured Greenhouse board tokens.
    */
   private getBoardTokens(): string[] {
+    const value = process.env.GREENHOUSE_BOARD_TOKENS;
+
+    this.logger.log(`GREENHOUSE_BOARD_TOKENS configured: ${Boolean(value)}`);
+
+    this.logger.log(
+      `Greenhouse board token count: ${value?.split(',').filter(Boolean).length ?? 0}`,
+    );
+
     return (
-      process.env.GREENHOUSE_BOARD_TOKENS?.split(',')
+      value
+        ?.split(',')
         .map((token) => token.trim())
         .filter(Boolean) ?? []
     );
