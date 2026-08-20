@@ -19,6 +19,8 @@ import { InterviewPrep } from './Interface/interview-prep.interface';
 import { interviewEvaluationPrompt } from './prompts/interview-evaluation.prompt';
 import { InterviewEvaluation } from './Interface/interview-evaluation.interface';
 import { UploadedAudioFile } from './Interface/audio.interface';
+import { coverLetterPrompt } from './prompts/cover-letter.prompt';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class AiService {
@@ -26,6 +28,7 @@ export class AiService {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
+    private storageService: StorageService,
   ) {
     this.ai = new GoogleGenAI({
       apiKey: this.configService.get<string>('GEMINI_API_KEY'),
@@ -171,6 +174,11 @@ export class AiService {
       );
     }
 
+    const fileUrl = await this.storageService.uploadResume(
+      file.buffer,
+      file.originalname,
+    );
+
     // ============================================================
     // 6. Save / update candidate resume
     // ============================================================
@@ -182,12 +190,14 @@ export class AiService {
 
       update: {
         fileName: file.originalname,
+        fileUrl,
         extractedText,
       },
 
       create: {
         userId,
         fileName: file.originalname,
+        fileUrl,
         extractedText,
       },
     });
@@ -202,6 +212,7 @@ export class AiService {
       resume: {
         id: resume.id,
         fileName: resume.fileName,
+        fileUrl: resume.fileUrl,
       },
     };
   }
@@ -586,5 +597,125 @@ Do not add quotation marks.
         'Unable to transcribe the interview recording.',
       );
     }
+  }
+
+  async generateCoverLetter(
+    resume: string,
+    jobTitle: string,
+    jobDescription: string,
+    companyName: string,
+  ) {
+    const models = AI_MODELS;
+
+    for (const model of models) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model,
+          contents: coverLetterPrompt(
+            resume,
+            jobTitle,
+            jobDescription,
+            companyName,
+          ),
+        });
+
+        const coverLetter = response.text?.trim();
+
+        if (!coverLetter) {
+          throw new BadRequestException(
+            'AI could not generate a cover letter.',
+          );
+        }
+
+        return {
+          coverLetter,
+        };
+      } catch (error) {
+        console.error(
+          `Cover letter generation failed for model ${model}`,
+          error,
+        );
+      }
+    }
+
+    throw new ServiceUnavailableException('All AI models are unavailable.');
+  }
+
+  async generateMyCoverLetter(userId: string, jobId: string) {
+    const resume = await this.prisma.resume.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        id: true,
+        extractedText: true,
+      },
+    });
+
+    if (!resume) {
+      throw new BadRequestException(
+        'Please upload your resume before generating a cover letter.',
+      );
+    }
+
+    if (!resume.extractedText?.trim()) {
+      throw new BadRequestException(
+        'Your resume does not contain extracted text.',
+      );
+    }
+
+    const job = await this.prisma.job.findUnique({
+      where: {
+        id: jobId,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        isActive: true,
+        companyName: true,
+        company: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!job) {
+      throw new BadRequestException('Job not found.');
+    }
+
+    if (!job.isActive) {
+      throw new BadRequestException('This job is no longer active.');
+    }
+
+    const companyName = job.company?.name || job.companyName || 'the company';
+
+    return this.generateCoverLetter(
+      resume.extractedText,
+      job.title,
+      job.description,
+      companyName,
+    );
+  }
+
+  async getMyResume(userId: string) {
+    const resume = await this.prisma.resume.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        id: true,
+        fileName: true,
+        fileUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      resume,
+    };
   }
 }

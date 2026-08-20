@@ -518,12 +518,21 @@ export class JobService {
       throw new ConflictException('You have already applied for this job');
     }
 
+    const resume = await this.prisma.resume.findUnique({
+      where: {
+        userId,
+      },
+      select: {
+        fileUrl: true,
+      },
+    });
+
     const application = await this.prisma.application.create({
       data: {
         candidateId: userId,
         jobId,
         coverLetter: dto.coverLetter,
-        resumeUrl: dto.resumeUrl,
+        resumeUrl: resume?.fileUrl ?? null,
       },
       include: {
         job: {

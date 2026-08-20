@@ -276,4 +276,48 @@ export class AiController {
   async transcribeInterviewAudio(@UploadedFile() file: UploadedAudioFile) {
     return this.aiService.transcribeInterviewAudio(file);
   }
+
+  @Post('cover-letter/:jobId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Generate AI cover letter',
+    description:
+      'Generates a personalized cover letter using the candidate resume and selected job.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cover letter generated successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Resume has not been uploaded or job is invalid.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized.',
+  })
+  generateCoverLetter(@Param('jobId') jobId: string, @CurrentUser() user: any) {
+    return this.aiService.generateMyCoverLetter(user.id, jobId);
+  }
+
+  @Get('resume')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get my uploaded resume',
+    description:
+      "Retrieves the authenticated candidate's currently uploaded resume.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Resume retrieved successfully.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized.',
+  })
+  getMyResume(@CurrentUser() user: any) {
+    return this.aiService.getMyResume(user.id);
+  }
 }

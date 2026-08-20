@@ -9,6 +9,7 @@ import { JobModule } from './job/job.module';
 import { ApplicationModule } from './application/application.module';
 import { SavedJobModule } from './saved-job/saved-job.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CandidateModule } from './candidate/candidate.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     ApplicationModule,
     SavedJobModule,
     DashboardModule,
+    CandidateModule,
   ],
 })
 export class AppModule {}
