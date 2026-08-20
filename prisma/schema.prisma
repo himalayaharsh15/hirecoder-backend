@@ -1,3 +1,46 @@
+// ============================================================================
+// Prisma Configuration
+// ============================================================================
+enum UserRole {
+  CANDIDATE
+  RECRUITER
+  ADMIN
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  FREELANCE
+}
+
+enum ExperienceLevel {
+  FRESHER
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+}
+
+enum ApplicationStatus {
+  APPLIED
+  UNDER_REVIEW
+  SHORTLISTED
+  INTERVIEW_SCHEDULED
+  OFFERED
+  REJECTED
+  HIRED
+  WITHDRAWN
+}
+
+enum JobSource {
+  HIRECODER
+  GREENHOUSE
+  ASHBY
+  ADZUNA
+}
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,22 +50,370 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// User
+// ============================================================================
+//
+// Stores authentication and identity information.
+//
+// Responsibilities
+// ----------------
+// • Register/Login
+// • Password
+// • Refresh Token
+// • One Profile
+// ============================================================================
+
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  image     String?
-  bio       String?
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
+
+  id    String @id @default(cuid())
+  name  String
+  email String @unique
+
+  // --------------------------------------------------------------------------
+  // Authentication
+  // --------------------------------------------------------------------------
+
+  password           String
+  hashedRefreshToken String?
+
+  role UserRole @default(CANDIDATE)
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
+
+  /// One User -> One Profile
+  profile Profile?
+
+  resume Resume?
+
+  companies    Company[]
+  applications Application[]
+  savedJobs    SavedJob[]
+
+  /// Jobs directly created by this recruiter
+  recruiterJobs Job[] @relation("RecruiterJobs")
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  Post      Post[]
 }
 
-model Post {
-  id        String   @id
-  content   String
-  authorId  String
+// ============================================================================
+// Profile
+// ============================================================================
+//
+// Stores professional information.
+//
+// Authentication data DOES NOT belong here.
+//
+// User (1) ---------- (1) Profile
+// ============================================================================
+
+model Profile {
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
+
+  id String @id @default(cuid())
+
+  // --------------------------------------------------------------------------
+  // Professional Information
+  // --------------------------------------------------------------------------
+
+  headline String?
+
+  bio String?
+
+  location String?
+
+  experience Int?
+
+  skills String[] @default([])
+
+  // --------------------------------------------------------------------------
+  // Social Links
+  // --------------------------------------------------------------------------
+
+  githubUrl String?
+
+  linkedinUrl String?
+
+  portfolioUrl String?
+
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
   createdAt DateTime @default(now())
-  User      User     @relation(fields: [authorId], references: [id])
+
+  updatedAt DateTime @updatedAt
+}
+
+model Company {
+  id String @id @default(cuid())
+
+  name String
+
+  description String?
+
+  website String?
+
+  location String?
+
+  logoUrl String?
+
+  ownerId String
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  jobs Job[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================================================
+// Job
+// ============================================================================
+//
+// Unified job model.
+//
+// A Job can come from:
+// 1. HireCoder recruiter
+// 2. External job source such as Greenhouse, Ashby, Adzuna, etc.
+//
+// The candidate doesn't need to know how the job entered HireCoder.
+// ============================================================================
+
+model Job {
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
+
+  id String @id @default(cuid())
+
+  title       String
+  description String
+
+  // --------------------------------------------------------------------------
+  // Job Details
+  // --------------------------------------------------------------------------
+
+  location        String?
+  employmentType  EmploymentType
+  experienceLevel ExperienceLevel
+
+  salaryMin Int?
+  salaryMax Int?
+  currency  String @default("INR")
+
+  // --------------------------------------------------------------------------
+  // Company
+  // --------------------------------------------------------------------------
+  //
+  // For HireCoder jobs, companyId can point to our Company table.
+  //
+  // For external jobs, companyId can be null because the external company
+  // may not have a HireCoder account.
+  // --------------------------------------------------------------------------
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  // Company name is stored directly so external jobs can still display
+  // the company name even when there is no HireCoder Company record.
+  companyName String?
+
+  // --------------------------------------------------------------------------
+  // Job Source
+  // --------------------------------------------------------------------------
+
+  source JobSource @default(HIRECODER)
+
+  // ID assigned by the external job provider.
+  //
+  // Example:
+  // Greenhouse -> sourceJobId
+  // Ashby      -> sourceJobId
+  //
+  // HireCoder jobs don't need this.
+  sourceJobId String?
+
+  // --------------------------------------------------------------------------
+  // External Job URLs
+  // --------------------------------------------------------------------------
+
+  // Original job page.
+  sourceUrl String?
+
+  // Actual application page.
+  applyUrl String?
+
+  // --------------------------------------------------------------------------
+  // Recruiter
+  // --------------------------------------------------------------------------
+  //
+  // Only HireCoder-created jobs need a recruiter.
+  // External jobs have recruiterId = null.
+  // --------------------------------------------------------------------------
+
+  recruiterId String?
+
+  recruiter User? @relation("RecruiterJobs", fields: [recruiterId], references: [id], onDelete: SetNull)
+
+  // --------------------------------------------------------------------------
+  // Status
+  // --------------------------------------------------------------------------
+
+  isActive Boolean @default(true)
+
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
+
+  applications Application[]
+  savedJobs    SavedJob[]
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // --------------------------------------------------------------------------
+  // Indexes / Constraints
+  // --------------------------------------------------------------------------
+
+  // Prevents importing the same external job twice.
+  //
+  // Because sourceJobId is optional, HireCoder jobs can have null here.
+  @@unique([source, sourceJobId])
+  // Helps us quickly find jobs from a particular source.
+  @@index([source])
+  // Helps with recruiter dashboard queries.
+  @@index([recruiterId])
+  // Helps with company-related queries.
+  @@index([companyId])
+}
+
+model Application {
+  // --------------------------------------------------------------------------
+  // Identity
+  // --------------------------------------------------------------------------
+
+  id String @id @default(cuid())
+
+  // --------------------------------------------------------------------------
+  // Application Details
+  // --------------------------------------------------------------------------
+
+  status ApplicationStatus @default(APPLIED)
+
+  coverLetter String?
+
+  resumeUrl String?
+
+  // --------------------------------------------------------------------------
+  // Relations
+  // --------------------------------------------------------------------------
+
+  candidateId String
+
+  jobId String
+
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  // --------------------------------------------------------------------------
+  // Constraints
+  // --------------------------------------------------------------------------
+
+  @@unique([candidateId, jobId])
+}
+
+model SavedJob {
+  id String @id @default(cuid())
+
+  candidateId String
+  candidate   User   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([candidateId, jobId])
+}
+
+// ============================================================================
+// Resume
+// ============================================================================
+//
+// Stores the candidate's uploaded resume.
+//
+// The actual PDF can be stored in object/file storage.
+// `fileUrl` stores its location.
+//
+// `extractedText` stores the text extracted from the PDF so that
+// AI features don't need to parse the same PDF repeatedly.
+//
+// User (1) ---------- (1) Resume
+// ============================================================================
+
+model Resume {
+  id String @id @default(cuid())
+
+  // --------------------------------------------------------------------------
+  // File information
+  // --------------------------------------------------------------------------
+
+  fileName String
+  fileUrl  String?
+
+  // --------------------------------------------------------------------------
+  // Extracted resume content
+  // --------------------------------------------------------------------------
+
+  extractedText String
+
+  // --------------------------------------------------------------------------
+  // Candidate
+  // --------------------------------------------------------------------------
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --------------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------------
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
