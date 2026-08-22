@@ -5,6 +5,8 @@ import {
   ExternalJobProvider,
 } from '../interface/external-job-provider.interface';
 
+import { detectJobCategory } from '../utils/job-category.util';
+
 interface GreenhouseJob {
   id: number;
   title: string;
@@ -116,6 +118,8 @@ export class GreenhouseProvider implements ExternalJobProvider {
       sourceJobId: String(job.id),
 
       source: JobSource.GREENHOUSE,
+
+      category: detectJobCategory(job.title, description),
 
       title: job.title,
 

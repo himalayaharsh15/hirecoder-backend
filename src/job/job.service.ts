@@ -205,6 +205,7 @@ export class JobService {
     const {
       search,
       location,
+      category,
       employmentType,
       experienceLevel,
       sort,
@@ -258,6 +259,10 @@ export class JobService {
       where.experienceLevel = experienceLevel;
     }
 
+    if (category) {
+      where.category = category;
+    }
+
     const orderBy: Prisma.JobOrderByWithRelationInput =
       sort === 'oldest' ? { createdAt: 'asc' } : { createdAt: 'desc' };
 
@@ -270,6 +275,7 @@ export class JobService {
         select: {
           id: true,
           title: true,
+          category: true,
           location: true,
           employmentType: true,
           experienceLevel: true,

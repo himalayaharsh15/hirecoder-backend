@@ -1,9 +1,16 @@
-import { JobSource, EmploymentType, ExperienceLevel } from '@prisma/client';
+import {
+  JobSource,
+  EmploymentType,
+  ExperienceLevel,
+  JobCategory,
+} from '@prisma/client';
 
 export interface ExternalJob {
   sourceJobId: string;
 
   source: JobSource;
+
+  category: JobCategory;
 
   title: string;
 

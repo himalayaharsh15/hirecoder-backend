@@ -41,6 +41,19 @@ enum JobSource {
   ADZUNA
 }
 
+enum JobCategory {
+  TECHNOLOGY
+  DATA
+  SALES
+  MARKETING
+  FINANCE
+  HUMAN_RESOURCES
+  DESIGN
+  OPERATIONS
+  CUSTOMER_SUPPORT
+  OTHER
+}
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -218,6 +231,7 @@ model Job {
   location        String?
   employmentType  EmploymentType
   experienceLevel ExperienceLevel
+  category        JobCategory     @default(OTHER)
 
   salaryMin Int?
   salaryMax Int?
@@ -308,6 +322,7 @@ model Job {
   // Helps us quickly find jobs from a particular source.
   @@index([source])
   // Helps with recruiter dashboard queries.
+  @@index([category])
   @@index([recruiterId])
   // Helps with company-related queries.
   @@index([companyId])

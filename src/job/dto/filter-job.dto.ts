@@ -1,4 +1,4 @@
-import { EmploymentType, ExperienceLevel } from '@prisma/client';
+import { EmploymentType, ExperienceLevel, JobCategory } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -20,6 +20,15 @@ export class FilterJobDto extends PaginationDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @ApiPropertyOptional({
+    enum: JobCategory,
+    example: JobCategory.DATA,
+    description: 'Filter jobs by category',
+  })
+  @IsOptional()
+  @IsEnum(JobCategory)
+  category?: JobCategory;
 
   @ApiPropertyOptional({
     enum: EmploymentType,

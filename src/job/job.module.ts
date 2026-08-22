@@ -5,6 +5,7 @@ import { JobOwnerService } from './job-owner.service';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { JobAggregationService } from './aggregatoion/job-aggregation.service';
 import { GreenhouseProvider } from './aggregatoion/provider/greenhouse.provider';
+import { AdzunaProvider } from './aggregatoion/provider/adzuna.provider';
 
 @Module({
   imports: [PrismaModule],
@@ -14,6 +15,7 @@ import { GreenhouseProvider } from './aggregatoion/provider/greenhouse.provider'
     JobOwnerService,
     JobAggregationService,
     GreenhouseProvider,
+    AdzunaProvider,
   ],
   exports: [JobOwnerService],
 })

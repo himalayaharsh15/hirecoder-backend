@@ -6,6 +6,7 @@ import {
   ExternalJobProvider,
 } from './interface/external-job-provider.interface';
 import { GreenhouseProvider } from './provider/greenhouse.provider';
+import { AdzunaProvider } from './provider/adzuna.provider';
 
 @Injectable()
 export class JobAggregationService {
@@ -16,6 +17,7 @@ export class JobAggregationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly greenhouseProvider: GreenhouseProvider,
+    private readonly adzunaProvider: AdzunaProvider,
   ) {
     /**
      * All external job providers are registered here.
@@ -28,7 +30,7 @@ export class JobAggregationService {
      *   adzunaProvider,
      * ]
      */
-    this.providers = [greenhouseProvider];
+    this.providers = [greenhouseProvider, adzunaProvider];
   }
 
   /**
@@ -111,6 +113,8 @@ export class JobAggregationService {
             employmentType: job.employmentType,
             experienceLevel: job.experienceLevel,
 
+            category: job.category,
+
             salaryMin: job.salaryMin,
             salaryMax: job.salaryMax,
             currency: job.currency ?? 'INR',
@@ -134,6 +138,7 @@ export class JobAggregationService {
 
             employmentType: job.employmentType,
             experienceLevel: job.experienceLevel,
+            category: job.category,
 
             salaryMin: job.salaryMin,
             salaryMax: job.salaryMax,
