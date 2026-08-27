@@ -321,10 +321,10 @@ export class AuthService {
   async googleLogin(googleLoginDto: GoogleLoginDto) {
     const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
 
-    console.log('GOOGLE_CLIENT_ID exists:', !!clientId);
+    console.log('GOOGLE_CLIENT_ID exists:', !!googleClientId);
     console.log(
       'GOOGLE_CLIENT_ID valid format:',
-      clientId?.endsWith('.apps.googleusercontent.com'),
+      googleClientId?.endsWith('.apps.googleusercontent.com'),
     );
 
     if (!googleClientId) {
