@@ -322,6 +322,7 @@ export class AuthService {
     const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
 
     console.log('GOOGLE_CLIENT_ID exists:', !!googleClientId);
+
     console.log(
       'GOOGLE_CLIENT_ID valid format:',
       googleClientId?.endsWith('.apps.googleusercontent.com'),
@@ -464,8 +465,10 @@ export class AuthService {
         },
       };
     } catch (error) {
-      // Don't expose Google's internal verification details
-      // to the client.
+      console.error('========== GOOGLE AUTH ERROR ==========');
+      console.error(error);
+      console.error('=======================================');
+
       throw new UnauthorizedException('Google authentication failed');
     }
   }
