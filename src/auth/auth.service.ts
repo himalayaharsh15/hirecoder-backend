@@ -10,6 +10,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LoginUserDto } from './DTO/login-user.dto';
 import { JwtService } from '@nestjs/jwt';
 import { RefreshTokenDto } from './DTO/refresh-token.dto';
+import { ConfigService } from '@nestjs/config';
+import { OAuth2Client } from 'google-auth-library';
+import { GoogleLoginDto } from './DTO/google-login.dto';
 
 /**
  * ============================================================
@@ -30,6 +33,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -101,6 +105,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    // Google-only accounts don't have a local password.
+    // They must use Google authentication.
+    if (!user.password) {
+      throw new UnauthorizedException(
+        'This account uses Google login. Please continue with Google.',
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(
       loginUserDto.password,
       user.password,
@@ -110,7 +122,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email, user.role);
 
     const hashedrefreshToken = await bcrypt.hash(tokens.refreshToken, 10);
 
@@ -285,5 +301,168 @@ export class AuthService {
     return {
       message: 'Logged out successfully',
     };
+  }
+
+  /**
+   * ============================================================
+   * Google Login
+   * ============================================================
+   *
+   * Flow:
+   * 1. Receive Google's ID token from the frontend.
+   * 2. Verify the token with Google.
+   * 3. Find the existing HireCoder user.
+   * 4. If the user doesn't exist, create one.
+   * 5. Generate HireCoder access + refresh tokens.
+   *
+   * Google verifies the user's identity.
+   * HireCoder still owns the application's JWT session.
+   */
+  async googleLogin(googleLoginDto: GoogleLoginDto) {
+    const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+
+    console.log('Google Client ID configured:', !!googleClientId);
+
+    if (!googleClientId) {
+      throw new UnauthorizedException(
+        'Google authentication is not configured',
+      );
+    }
+
+    try {
+      // OAuth2Client is used to verify Google's ID token.
+      const client = new OAuth2Client();
+
+      const ticket = await client.verifyIdToken({
+        idToken: googleLoginDto.credential,
+        audience: googleClientId,
+      });
+
+      // Only use information after Google's token has been verified.
+      const payload = ticket.getPayload();
+
+      if (!payload) {
+        throw new UnauthorizedException(
+          'Invalid Google authentication response',
+        );
+      }
+
+      const googleId = payload.sub;
+      const email = payload.email;
+      const name = payload.name;
+
+      // Make sure the Google account contains the information
+      // required to create/login to a HireCoder account.
+      if (!googleId || !email || !name) {
+        throw new UnauthorizedException(
+          'Google account information is incomplete',
+        );
+      }
+
+      // Only allow accounts whose Google email has been verified.
+      if (!payload.email_verified) {
+        throw new UnauthorizedException('Google email address is not verified');
+      }
+
+      // ----------------------------------------------------------
+      // Find user by Google ID first.
+      // ----------------------------------------------------------
+
+      let user = await this.prisma.user.findUnique({
+        where: {
+          googleId,
+        },
+      });
+
+      // ----------------------------------------------------------
+      // If Google ID isn't linked yet, check the email.
+      //
+      // This allows an existing HireCoder account to be linked
+      // to its Google account.
+      // ----------------------------------------------------------
+
+      if (!user) {
+        user = await this.prisma.user.findUnique({
+          where: {
+            email,
+          },
+        });
+      }
+
+      // ----------------------------------------------------------
+      // Existing HireCoder user
+      // ----------------------------------------------------------
+
+      if (user) {
+        // Existing email/password account that hasn't linked
+        // Google yet.
+        if (!user.googleId) {
+          user = await this.prisma.user.update({
+            where: {
+              id: user.id,
+            },
+            data: {
+              googleId,
+            },
+          });
+        }
+      }
+
+      // ----------------------------------------------------------
+      // New HireCoder user
+      // ----------------------------------------------------------
+
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            name,
+            email,
+
+            // Google users don't need a local password.
+            password: null,
+
+            // Store Google's stable account identifier.
+            googleId,
+
+            // New users are candidates by default.
+            role: 'CANDIDATE',
+          },
+        });
+      }
+
+      // ----------------------------------------------------------
+      // Generate HireCoder JWT tokens.
+      // ----------------------------------------------------------
+
+      const tokens = await this.generateTokens(user.id, user.email, user.role);
+
+      // Never store the refresh token itself.
+      // Store only its bcrypt hash.
+      const hashedRefreshToken = await bcrypt.hash(tokens.refreshToken, 10);
+
+      await this.prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          hashedRefreshToken,
+        },
+      });
+
+      return {
+        message: 'Google login successful',
+        ...tokens,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      };
+    } catch (error) {
+      // Don't expose Google's internal verification details
+      // to the client.
+      throw new UnauthorizedException('Google authentication failed');
+    }
   }
 }

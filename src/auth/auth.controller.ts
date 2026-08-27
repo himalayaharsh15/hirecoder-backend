@@ -13,6 +13,7 @@ import { RefreshTokenDto } from './DTO/refresh-token.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import * as currentUserType from './types/current-user.type';
+import { GoogleLoginDto } from './DTO/google-login.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -95,5 +96,33 @@ export class AuthController {
   @Post('logout')
   logout(@CurrentUser() user: currentUserType.CurrentUserType) {
     return this.authService.logout(user.id);
+  }
+
+  /**
+   * ============================================================
+   * Google Login
+   * ============================================================
+   *
+   * The frontend sends the Google ID token.
+   *
+   * The backend:
+   * 1. Verifies the token with Google.
+   * 2. Finds or creates the HireCoder user.
+   * 3. Generates the normal HireCoder JWT tokens.
+   */
+  @ApiOperation({
+    summary: 'Login with Google',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Google login successful.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid Google authentication.',
+  })
+  @Post('google')
+  googleLogin(@Body() googleLoginDto: GoogleLoginDto) {
+    return this.authService.googleLogin(googleLoginDto);
   }
 }

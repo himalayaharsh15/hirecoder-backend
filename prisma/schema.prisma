@@ -90,7 +90,13 @@ model User {
   // Authentication
   // --------------------------------------------------------------------------
 
-  password           String
+  // Local password.
+  // Nullable because Google-authenticated users don't need a password.
+  password String?
+
+  // Google account's unique identifier.
+  // Nullable because normal email/password users don't have one.
+  googleId           String? @unique
   hashedRefreshToken String?
 
   role UserRole @default(CANDIDATE)
