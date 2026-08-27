@@ -465,10 +465,6 @@ export class AuthService {
         },
       };
     } catch (error) {
-      console.error('========== GOOGLE AUTH ERROR ==========');
-      console.error(error);
-      console.error('=======================================');
-
       throw new UnauthorizedException('Google authentication failed');
     }
   }
